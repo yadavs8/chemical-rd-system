@@ -1,0 +1,72 @@
+# ==============================================================================
+# CHEMICAL R&D MANAGEMENT SYSTEM - AIR-GAPPED DOCKER COMPOSE
+# Complete offline stack: Next.js + FastAPI Scientific Engine + Ollama + PostgreSQL
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # 1. Next.js 15 Web Application
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: chem_rd_web
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - APP_ENV=production
+      - NEXT_PUBLIC_SUPABASE_URL=http://postgres:5432
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SCIENTIFIC_SERVICE_URL=http://sidecar:8000
+      - SCIENTIFIC_SERVICE_SECRET=${SCIENTIFIC_SERVICE_SECRET}
+    depends_on:
+      - postgres
+      - sidecar
+
+  # 2. Python FastAPI Scientific & Diagnostic Sidecar
+  sidecar:
+    build:
+      context: ./sidecar_service
+      dockerfile: Dockerfile
+    container_name: chem_rd_sidecar
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - SCIENTIFIC_SERVICE_SECRET=${SCIENTIFIC_SERVICE_SECRET}
+      - USE_LOCAL_LLM=true
+      - LOCAL_LLM_BASE_URL=http://ollama:11434/v1
+      - LOCAL_LLM_MODEL=llama3:70b
+    depends_on:
+      - ollama
+
+  # 3. Local Air-Gapped LLM Inference (Ollama)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: chem_rd_ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+
+  # 4. Local PostgreSQL 16 with pgvector (Offline Database)
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: chem_rd_db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=chem_rd_secure_offline_pass_2026
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./supabase/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql
+
+volumes:
+  pgdata:
+  ollama_models:
