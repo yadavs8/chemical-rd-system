@@ -10,6 +10,7 @@ import AttachmentVault from "@/components/AttachmentVault";
 import HistoricalFailureSearch from "@/components/HistoricalFailureSearch";
 import ValidatedLibrary from "@/components/ValidatedLibrary";
 import ResearchDossier from "@/components/ResearchDossier";
+import DedicatedLabReport from "@/components/DedicatedLabReport";
 import { 
   FolderGit2, 
   FlaskConical, 
@@ -25,12 +26,13 @@ import {
   Sliders, 
   FileCheck2, 
   ChevronRight, 
-  Paperclip,
-  ArrowRight,
-  Printer,
-  ShieldAlert,
-  Award,
-  BookOpen
+  Paperclip, 
+  ArrowRight, 
+  Printer, 
+  ShieldAlert, 
+  Award, 
+  BookOpen,
+  FileSpreadsheet
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -43,7 +45,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   
   // Navigation tabs
-  const [activeTab, setActiveTab] = useState<"apparatus" | "bom" | "experiments" | "failures" | "library" | "research" | "diff" | "vault" | "diagnostics">("apparatus");
+  const [activeTab, setActiveTab] = useState<"apparatus" | "bom" | "experiments" | "failures" | "library" | "research" | "report" | "diff" | "vault" | "diagnostics">("apparatus");
 
   // Diff comparison selection
   const [diffVersionA, setDiffVersionA] = useState<ApparatusVersion | null>(null);
@@ -311,8 +313,8 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Top Workspace Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      {/* Top Workspace Header (Hidden on Print) */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800 print:hidden">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="font-mono text-xs text-emerald-400 font-bold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">
@@ -328,12 +330,12 @@ export default function Dashboard() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => window.print()}
+            onClick={() => setActiveTab("report")}
             className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 transition flex items-center gap-2 text-xs font-mono"
-            title="Print / Save PDF Lab Report"
+            title="View Official Lab Report"
           >
             <Printer className="w-4 h-4 text-cyan-400" />
-            Export Lab Report
+            Formal Report View
           </button>
           <button 
             onClick={fetchWorkspaceData}
@@ -345,8 +347,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Main Navigation Tabs */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
+      {/* Main Navigation Tabs (Hidden on Print) */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3 print:hidden">
         <button
           onClick={() => setActiveTab("apparatus")}
           className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
@@ -405,6 +407,16 @@ export default function Dashboard() {
         >
           <BookOpen className="w-4 h-4 text-cyan-400" />
           Research & Patents
+        </button>
+
+        <button
+          onClick={() => setActiveTab("report")}
+          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
+            activeTab === "report" ? "bg-emerald-600 text-white border border-emerald-500 shadow-sm" : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <Printer className="w-4 h-4 text-white" />
+          Lab Report PDF View
         </button>
 
         <button
@@ -654,7 +666,16 @@ export default function Dashboard() {
         <ResearchDossier />
       )}
 
-      {/* TAB 7: SIDE-BY-SIDE DIFF ENGINE */}
+      {/* TAB 7: DEDICATED LAB REPORT VIEW */}
+      {activeTab === "report" && (
+        <DedicatedLabReport
+          apparatus={selectedApparatus}
+          version={selectedVersion}
+          bomItems={bomItems}
+        />
+      )}
+
+      {/* TAB 8: SIDE-BY-SIDE DIFF ENGINE */}
       {activeTab === "diff" && (
         <div className="space-y-4">
           {diffVersionA && diffVersionB ? (
@@ -672,12 +693,12 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* TAB 8: ATTACHMENT VAULT */}
+      {/* TAB 9: ATTACHMENT VAULT */}
       {activeTab === "vault" && (
         <AttachmentVault />
       )}
 
-      {/* TAB 9: AI ROOT-CAUSE DIAGNOSTICS */}
+      {/* TAB 10: AI ROOT-CAUSE DIAGNOSTICS */}
       {activeTab === "diagnostics" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-5 p-5 rounded-2xl border border-slate-800 bg-slate-900/40 space-y-4">
