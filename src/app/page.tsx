@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabase";
 import { Project, Apparatus, ApparatusVersion, BomItem } from "@/types";
 import BomBuilder from "@/components/BomBuilder";
 import VersionDiffViewer from "@/components/VersionDiffViewer";
+import ExperimentLogger from "@/components/ExperimentLogger";
+import AttachmentVault from "@/components/AttachmentVault";
 import { 
   FolderGit2, 
   FlaskConical, 
@@ -12,16 +14,17 @@ import {
   Lock, 
   CheckCircle2, 
   AlertTriangle, 
-  XCircle,
-  Plus,
-  RefreshCw,
-  Cpu,
-  GitCompare,
-  Sliders,
-  FileCheck2,
-  ChevronRight,
-  ShieldAlert,
-  ArrowRight
+  XCircle, 
+  Plus, 
+  RefreshCw, 
+  Cpu, 
+  GitCompare, 
+  Sliders, 
+  FileCheck2, 
+  ChevronRight, 
+  Paperclip,
+  ArrowRight,
+  Printer
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -34,7 +37,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   
   // Navigation tabs
-  const [activeTab, setActiveTab] = useState<"apparatus" | "bom" | "diff" | "experiments" | "diagnostics">("apparatus");
+  const [activeTab, setActiveTab] = useState<"apparatus" | "bom" | "diff" | "experiments" | "vault" | "diagnostics">("apparatus");
 
   // Diff comparison selection
   const [diffVersionA, setDiffVersionA] = useState<ApparatusVersion | null>(null);
@@ -96,10 +99,7 @@ export default function Dashboard() {
   async function handleSaveBom(items: BomItem[]) {
     if (!selectedVersion) return;
     try {
-      // 1. Delete old items for this version (if not immutable)
       await supabase.from("bom_items").delete().eq("apparatus_version_id", selectedVersion.id);
-
-      // 2. Insert updated items
       const payload = items.map((item) => ({
         apparatus_version_id: selectedVersion.id,
         component_name: item.component_name,
@@ -130,7 +130,6 @@ export default function Dashboard() {
       const nextVersionNum = parentVersion.version_number + 1;
       const nextVersionTag = `V${nextVersionNum}.0`;
 
-      // 1. Create new branched version record
       const { data: newVer, error: vErr } = await supabase.from("apparatus_versions").insert({
         apparatus_id: selectedApparatus.id,
         parent_version_id: parentVersion.id,
@@ -149,7 +148,6 @@ export default function Dashboard() {
 
       if (vErr) throw vErr;
 
-      // 2. Clone BOM items to the new version
       const { data: currentBoms } = await supabase.from("bom_items").select("*").eq("apparatus_version_id", parentVersion.id);
       if (currentBoms && currentBoms.length > 0) {
         const clonedBoms = currentBoms.map((b) => ({
@@ -173,6 +171,47 @@ export default function Dashboard() {
       alert(`Successfully branched ${parentVersion.version_tag} into new revision: ${nextVersionTag}`);
     } catch (err: any) {
       alert("Error branching configuration: " + err.message);
+    }
+  }
+
+  async function handleSaveExperiment(expData: any) {
+    if (!selectedApparatus) return;
+    try {
+      const { data: newExp, error: expErr } = await supabase.from("experiments").insert({
+        project_id: selectedApparatus.project_id,
+        apparatus_version_id: expData.apparatus_version_id,
+        experiment_code: expData.experiment_code,
+        procedure_steps: expData.procedure_steps,
+        observed_deviations: expData.observed_deviations,
+        primary_outcome: expData.primary_outcome,
+        engineer_notes: expData.engineer_notes,
+        is_locked: false
+      }).select().single();
+
+      if (expErr) throw expErr;
+
+      if (expData.measurements && expData.measurements.length > 0) {
+        const mPayload = expData.measurements.map((m: any) => ({
+          experiment_id: newExp.id,
+          parameter_name: m.parameter_name,
+          measured_value: m.measured_value,
+          uncertainty_margin: m.uncertainty_margin || 0,
+          unit: m.unit,
+          run_index: m.run_index || 1,
+          is_outlier: false
+        }));
+        await supabase.from("measurements").insert(mPayload);
+      }
+
+      alert(`Experiment test run ${expData.experiment_code} successfully committed with outcome: ${expData.primary_outcome}!`);
+      
+      // If failed or needs improvement, switch automatically to AI diagnostics
+      if (expData.primary_outcome !== "SUCCESSFUL") {
+        setDiagObs(expData.observed_deviations || "Performance failed to meet target acceptance thresholds.");
+        setActiveTab("diagnostics");
+      }
+    } catch (err: any) {
+      alert("Error saving experiment: " + err.message);
     }
   }
 
@@ -241,7 +280,6 @@ export default function Dashboard() {
       const data = await res.json();
       setDiagResult(data);
     } catch (err: any) {
-      // Heuristic fallback
       setDiagResult({
         outcome_summary: "Catalytic thermal runaway confirmed. Radial heat dissipation capacity is exceeded by the exothermic hydrogenation enthalpy.",
         ranked_causes: [
@@ -284,6 +322,14 @@ export default function Dashboard() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => window.print()}
+            className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 transition flex items-center gap-2 text-xs font-mono"
+            title="Print / Save PDF Lab Report"
+          >
+            <Printer className="w-4 h-4 text-cyan-400" />
+            Export Lab Report
+          </button>
           <button 
             onClick={fetchWorkspaceData}
             className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 transition"
@@ -303,7 +349,7 @@ export default function Dashboard() {
           }`}
         >
           <FlaskConical className="w-4 h-4 text-emerald-400" />
-          Apparatus & Version Tree
+          Apparatus & Versions
         </button>
 
         <button
@@ -313,7 +359,17 @@ export default function Dashboard() {
           }`}
         >
           <Sliders className="w-4 h-4 text-cyan-400" />
-          BOM & Metallurgy ({bomItems.length})
+          BOM Metallurgy ({bomItems.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab("experiments")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
+            activeTab === "experiments" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <FileCheck2 className="w-4 h-4 text-amber-400" />
+          Experiment Test Run Logger
         </button>
 
         <button
@@ -324,6 +380,16 @@ export default function Dashboard() {
         >
           <GitCompare className="w-4 h-4 text-purple-400" />
           Configuration Diff Engine
+        </button>
+
+        <button
+          onClick={() => setActiveTab("vault")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
+            activeTab === "vault" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <Paperclip className="w-4 h-4 text-emerald-400" />
+          Attachment Vault
         </button>
 
         <button
@@ -485,7 +551,6 @@ export default function Dashboard() {
                             </div>
                           </div>
 
-                          {/* Operating parameters snapshot */}
                           <div className="mt-3 pt-3 border-t border-slate-800/60 flex flex-wrap gap-2 text-[11px] font-mono">
                             {Object.entries(ver.operating_parameters || {}).map(([key, val]) => (
                               <span key={key} className="px-2 py-1 rounded bg-slate-950 border border-slate-850 text-slate-300">
@@ -534,7 +599,20 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* TAB 3: SIDE-BY-SIDE DIFF ENGINE */}
+      {/* TAB 3: EXPERIMENT TEST RUN LOGGER */}
+      {activeTab === "experiments" && selectedVersion && (
+        <ExperimentLogger
+          version={selectedVersion}
+          onSaveExperiment={handleSaveExperiment}
+        />
+      )}
+
+      {/* TAB 4: ATTACHMENT VAULT */}
+      {activeTab === "vault" && (
+        <AttachmentVault />
+      )}
+
+      {/* TAB 5: SIDE-BY-SIDE DIFF ENGINE */}
       {activeTab === "diff" && (
         <div className="space-y-4">
           {diffVersionA && diffVersionB ? (
@@ -546,13 +624,13 @@ export default function Dashboard() {
             />
           ) : (
             <div className="p-12 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-2xl">
-              Go to the <strong>Apparatus & Version Tree</strong> tab and click <strong>Diff vs V(previous)</strong> on any iterated configuration to view side-by-side changes.
+              Go to the <strong>Apparatus & Versions</strong> tab and click <strong>Diff vs V(previous)</strong> on any iterated configuration to view side-by-side changes.
             </div>
           )}
         </div>
       )}
 
-      {/* TAB 4: AI ROOT-CAUSE DIAGNOSTICS */}
+      {/* TAB 6: AI ROOT-CAUSE DIAGNOSTICS */}
       {activeTab === "diagnostics" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-5 p-5 rounded-2xl border border-slate-800 bg-slate-900/40 space-y-4">
