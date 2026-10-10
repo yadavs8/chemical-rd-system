@@ -9,6 +9,7 @@ import ExperimentLogger from "@/components/ExperimentLogger";
 import AttachmentVault from "@/components/AttachmentVault";
 import HistoricalFailureSearch from "@/components/HistoricalFailureSearch";
 import ValidatedLibrary from "@/components/ValidatedLibrary";
+import ResearchDossier from "@/components/ResearchDossier";
 import { 
   FolderGit2, 
   FlaskConical, 
@@ -28,7 +29,8 @@ import {
   ArrowRight,
   Printer,
   ShieldAlert,
-  Award
+  Award,
+  BookOpen
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -41,7 +43,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   
   // Navigation tabs
-  const [activeTab, setActiveTab] = useState<"apparatus" | "bom" | "experiments" | "failures" | "library" | "diff" | "vault" | "diagnostics">("apparatus");
+  const [activeTab, setActiveTab] = useState<"apparatus" | "bom" | "experiments" | "failures" | "library" | "research" | "diff" | "vault" | "diagnostics">("apparatus");
 
   // Diff comparison selection
   const [diffVersionA, setDiffVersionA] = useState<ApparatusVersion | null>(null);
@@ -396,6 +398,16 @@ export default function Dashboard() {
         </button>
 
         <button
+          onClick={() => setActiveTab("research")}
+          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
+            activeTab === "research" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <BookOpen className="w-4 h-4 text-cyan-400" />
+          Research & Patents
+        </button>
+
+        <button
           onClick={() => setActiveTab("diff")}
           className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
             activeTab === "diff" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
@@ -637,7 +649,12 @@ export default function Dashboard() {
         <ValidatedLibrary />
       )}
 
-      {/* TAB 6: SIDE-BY-SIDE DIFF ENGINE */}
+      {/* TAB 6: SCIENTIFIC RESEARCH & PATENTS */}
+      {activeTab === "research" && (
+        <ResearchDossier />
+      )}
+
+      {/* TAB 7: SIDE-BY-SIDE DIFF ENGINE */}
       {activeTab === "diff" && (
         <div className="space-y-4">
           {diffVersionA && diffVersionB ? (
@@ -655,12 +672,12 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* TAB 7: ATTACHMENT VAULT */}
+      {/* TAB 8: ATTACHMENT VAULT */}
       {activeTab === "vault" && (
         <AttachmentVault />
       )}
 
-      {/* TAB 8: AI ROOT-CAUSE DIAGNOSTICS */}
+      {/* TAB 9: AI ROOT-CAUSE DIAGNOSTICS */}
       {activeTab === "diagnostics" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-5 p-5 rounded-2xl border border-slate-800 bg-slate-900/40 space-y-4">
