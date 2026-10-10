@@ -7,6 +7,8 @@ import BomBuilder from "@/components/BomBuilder";
 import VersionDiffViewer from "@/components/VersionDiffViewer";
 import ExperimentLogger from "@/components/ExperimentLogger";
 import AttachmentVault from "@/components/AttachmentVault";
+import HistoricalFailureSearch from "@/components/HistoricalFailureSearch";
+import ValidatedLibrary from "@/components/ValidatedLibrary";
 import { 
   FolderGit2, 
   FlaskConical, 
@@ -24,7 +26,9 @@ import {
   ChevronRight, 
   Paperclip,
   ArrowRight,
-  Printer
+  Printer,
+  ShieldAlert,
+  Award
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -37,7 +41,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   
   // Navigation tabs
-  const [activeTab, setActiveTab] = useState<"apparatus" | "bom" | "diff" | "experiments" | "vault" | "diagnostics">("apparatus");
+  const [activeTab, setActiveTab] = useState<"apparatus" | "bom" | "experiments" | "failures" | "library" | "diff" | "vault" | "diagnostics">("apparatus");
 
   // Diff comparison selection
   const [diffVersionA, setDiffVersionA] = useState<ApparatusVersion | null>(null);
@@ -205,7 +209,6 @@ export default function Dashboard() {
 
       alert(`Experiment test run ${expData.experiment_code} successfully committed with outcome: ${expData.primary_outcome}!`);
       
-      // If failed or needs improvement, switch automatically to AI diagnostics
       if (expData.primary_outcome !== "SUCCESSFUL") {
         setDiagObs(expData.observed_deviations || "Performance failed to meet target acceptance thresholds.");
         setActiveTab("diagnostics");
@@ -344,7 +347,7 @@ export default function Dashboard() {
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
         <button
           onClick={() => setActiveTab("apparatus")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
+          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
             activeTab === "apparatus" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
           }`}
         >
@@ -354,7 +357,7 @@ export default function Dashboard() {
 
         <button
           onClick={() => setActiveTab("bom")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
+          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
             activeTab === "bom" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
           }`}
         >
@@ -364,42 +367,62 @@ export default function Dashboard() {
 
         <button
           onClick={() => setActiveTab("experiments")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
+          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
             activeTab === "experiments" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
           }`}
         >
           <FileCheck2 className="w-4 h-4 text-amber-400" />
-          Experiment Test Run Logger
+          Test Run Logger
+        </button>
+
+        <button
+          onClick={() => setActiveTab("failures")}
+          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
+            activeTab === "failures" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <ShieldAlert className="w-4 h-4 text-rose-400" />
+          Past Failure Guardian
+        </button>
+
+        <button
+          onClick={() => setActiveTab("library")}
+          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
+            activeTab === "library" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <Award className="w-4 h-4 text-emerald-400" />
+          Validated Library
         </button>
 
         <button
           onClick={() => setActiveTab("diff")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
+          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
             activeTab === "diff" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
           }`}
         >
           <GitCompare className="w-4 h-4 text-purple-400" />
-          Configuration Diff Engine
+          Diff Engine
         </button>
 
         <button
           onClick={() => setActiveTab("vault")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
+          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
             activeTab === "vault" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
           }`}
         >
-          <Paperclip className="w-4 h-4 text-emerald-400" />
-          Attachment Vault
+          <Paperclip className="w-4 h-4 text-teal-400" />
+          Vault
         </button>
 
         <button
           onClick={() => setActiveTab("diagnostics")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
+          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
             activeTab === "diagnostics" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
           }`}
         >
           <Cpu className="w-4 h-4 text-rose-400" />
-          AI Root-Cause Diagnostics
+          AI Diagnostics
         </button>
       </div>
 
@@ -407,7 +430,6 @@ export default function Dashboard() {
       {activeTab === "apparatus" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left Column: Apparatus List */}
             <div className="lg:col-span-5 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-white text-sm">Registered Chemical Rigs</h3>
@@ -451,7 +473,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Right Column: Version Lineage & Branching Controls */}
             <div className="lg:col-span-7 space-y-4">
               {selectedApparatus ? (
                 <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 space-y-5">
@@ -483,7 +504,6 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  {/* Version List for selected apparatus */}
                   <div className="space-y-3">
                     {versions.filter((v) => v.apparatus_id === selectedApparatus.id).map((ver, idx, arr) => {
                       const isVerSelected = selectedVersion?.id === ver.id;
@@ -607,12 +627,17 @@ export default function Dashboard() {
         />
       )}
 
-      {/* TAB 4: ATTACHMENT VAULT */}
-      {activeTab === "vault" && (
-        <AttachmentVault />
+      {/* TAB 4: PAST FAILURE GUARDIAN */}
+      {activeTab === "failures" && (
+        <HistoricalFailureSearch />
       )}
 
-      {/* TAB 5: SIDE-BY-SIDE DIFF ENGINE */}
+      {/* TAB 5: VALIDATED LIBRARY */}
+      {activeTab === "library" && (
+        <ValidatedLibrary />
+      )}
+
+      {/* TAB 6: SIDE-BY-SIDE DIFF ENGINE */}
       {activeTab === "diff" && (
         <div className="space-y-4">
           {diffVersionA && diffVersionB ? (
@@ -630,7 +655,12 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* TAB 6: AI ROOT-CAUSE DIAGNOSTICS */}
+      {/* TAB 7: ATTACHMENT VAULT */}
+      {activeTab === "vault" && (
+        <AttachmentVault />
+      )}
+
+      {/* TAB 8: AI ROOT-CAUSE DIAGNOSTICS */}
       {activeTab === "diagnostics" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-5 p-5 rounded-2xl border border-slate-800 bg-slate-900/40 space-y-4">
