@@ -272,7 +272,9 @@ export default function Dashboard() {
                                 {ver.status}
                               </span>
                               {ver.is_immutable && (
-                                <Lock className="w-3 h-3 text-slate-500" title="Immutable Historical Record" />
+                                <span title="Immutable Historical Record">
+                                  <Lock className="w-3 h-3 text-slate-500" />
+                                </span>
                               )}
                             </div>
                           </div>
