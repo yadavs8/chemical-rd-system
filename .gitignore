@@ -1,0 +1,51 @@
+# Environment Variables & Secrets (CRITICAL FOR CONFIDENTIALITY)
+.env
+.env*.local
+.env.production
+.env.staging
+*.env
+*.pem
+*.key
+*.cert
+service-account*.json
+credentials.json
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+
+# Next.js Build Outputs
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+
+# Test & Coverage
+coverage/
+*.lcov
+.nyc_output/
+.pytest_cache/
+
+# IDE & OS Files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Chemical R&D Reports & Temporary Exports
+reports/generated/
+*.pdf
+*.csv.tmp
+tmp/
+scratch/
