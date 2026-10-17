@@ -272,111 +272,251 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Main Navigation Tabs (Hidden on Print) */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3 print:hidden">
-        <button
-          onClick={() => setActiveTab("apparatus")}
-          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
-            activeTab === "apparatus" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <FlaskConical className="w-4 h-4 text-emerald-400" />
-          Apparatus & Versions
-        </button>
+      {/* Executive 2-Column Dashboard Layout: Left List-View Sidebar + Right Operations Canvas */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* LEFT NAVIGATION LIST VIEW SIDEBAR (Sticky on Desktop) */}
+        <aside className="lg:col-span-4 xl:col-span-3 space-y-4 print:hidden lg:sticky lg:top-24">
+          {/* Active Rig Context Card */}
+          <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono tracking-widest text-slate-500 uppercase font-semibold">Selected Apparatus</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+                {selectedApparatus?.apparatus_code || "RIG"}
+              </span>
+            </div>
 
-        <button
-          onClick={() => setActiveTab("bom")}
-          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
-            activeTab === "bom" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <Sliders className="w-4 h-4 text-cyan-400" />
-          BOM Metallurgy ({bomItems.length})
-        </button>
+            {apparatusList.length > 0 && (
+              <div className="space-y-1">
+                <select
+                  value={selectedApparatus?.id || ""}
+                  onChange={(e) => {
+                    const found = apparatusList.find((a) => a.id === e.target.value);
+                    if (found) {
+                      setSelectedApparatus(found);
+                      const appVers = versions.filter((v) => v.apparatus_id === found.id);
+                      if (appVers[0]) handleSelectVersion(appVers[0]);
+                    }
+                  }}
+                  className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-emerald-500 transition cursor-pointer"
+                >
+                  {apparatusList.map((app) => (
+                    <option key={app.id} value={app.id}>
+                      {app.apparatus_code} · {app.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400 line-clamp-1 px-1">
+                  {selectedApparatus?.apparatus_type}
+                </p>
+              </div>
+            )}
 
-        <button
-          onClick={() => setActiveTab("experiments")}
-          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
-            activeTab === "experiments" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <FileCheck2 className="w-4 h-4 text-amber-400" />
-          Test Run Logger
-        </button>
+            <div className="pt-2.5 border-t border-slate-800 flex items-center justify-between text-xs font-mono">
+              <span className="text-slate-400">Target Lineage:</span>
+              <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                selectedVersion?.is_immutable 
+                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+                  : "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"
+              }`}>
+                {selectedVersion?.version_tag || "V1.0"} {selectedVersion?.is_immutable ? "● FROZEN" : "● ACTIVE"}
+              </span>
+            </div>
+          </div>
 
-        <button
-          onClick={() => setActiveTab("failures")}
-          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
-            activeTab === "failures" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <ShieldAlert className="w-4 h-4 text-rose-400" />
-          Past Failure Guardian
-        </button>
+          {/* Module Navigation List Panel */}
+          <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-4">
+            {/* GROUP 1: HARDWARE & METALLURGY */}
+            <div>
+              <div className="px-3 pb-1.5 text-[10px] font-mono tracking-wider text-slate-500 uppercase font-semibold">
+                Hardware & Metallurgy
+              </div>
+              <div className="space-y-1">
+                <button
+                  onClick={() => setActiveTab("apparatus")}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition text-left ${
+                    activeTab === "apparatus"
+                      ? "bg-slate-800 text-white shadow-sm border border-slate-700 font-semibold ring-1 ring-emerald-500/30"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <FlaskConical className={`w-4 h-4 ${activeTab === "apparatus" ? "text-emerald-400" : "text-slate-500"}`} />
+                    <span>Apparatus & Versions</span>
+                  </div>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-400">
+                    {versions.filter((v) => v.apparatus_id === selectedApparatus?.id).length || versions.length} V
+                  </span>
+                </button>
 
-        <button
-          onClick={() => setActiveTab("library")}
-          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
-            activeTab === "library" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <Award className="w-4 h-4 text-emerald-400" />
-          Validated Library
-        </button>
+                <button
+                  onClick={() => setActiveTab("bom")}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition text-left ${
+                    activeTab === "bom"
+                      ? "bg-slate-800 text-white shadow-sm border border-slate-700 font-semibold ring-1 ring-cyan-500/30"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Sliders className={`w-4 h-4 ${activeTab === "bom" ? "text-cyan-400" : "text-slate-500"}`} />
+                    <span>BOM Metallurgy</span>
+                  </div>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-bold">
+                    {bomItems.length} items
+                  </span>
+                </button>
 
-        <button
-          onClick={() => setActiveTab("research")}
-          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
-            activeTab === "research" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <BookOpen className="w-4 h-4 text-cyan-400" />
-          Research & Patents
-        </button>
+                <button
+                  onClick={() => setActiveTab("diff")}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition text-left ${
+                    activeTab === "diff"
+                      ? "bg-slate-800 text-white shadow-sm border border-slate-700 font-semibold ring-1 ring-purple-500/30"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <GitCompare className={`w-4 h-4 ${activeTab === "diff" ? "text-purple-400" : "text-slate-500"}`} />
+                    <span>Lineage Diff Engine</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-purple-400/80">Δ Matrix</span>
+                </button>
+              </div>
+            </div>
 
-        <button
-          onClick={() => setActiveTab("report")}
-          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
-            activeTab === "report" ? "bg-emerald-600 text-white border border-emerald-500 shadow-sm" : "text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <Printer className="w-4 h-4 text-white" />
-          Lab Report PDF View
-        </button>
+            {/* GROUP 2: TESTING & SAFETY */}
+            <div className="pt-2 border-t border-slate-800/70">
+              <div className="px-3 pb-1.5 text-[10px] font-mono tracking-wider text-slate-500 uppercase font-semibold">
+                Testing & Safety
+              </div>
+              <div className="space-y-1">
+                <button
+                  onClick={() => setActiveTab("experiments")}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition text-left ${
+                    activeTab === "experiments"
+                      ? "bg-slate-800 text-white shadow-sm border border-slate-700 font-semibold ring-1 ring-amber-500/30"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <FileCheck2 className={`w-4 h-4 ${activeTab === "experiments" ? "text-amber-400" : "text-slate-500"}`} />
+                    <span>Test Run Logger</span>
+                  </div>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                    SOP ±σ
+                  </span>
+                </button>
 
-        <button
-          onClick={() => setActiveTab("diff")}
-          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
-            activeTab === "diff" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <GitCompare className="w-4 h-4 text-purple-400" />
-          Diff Engine
-        </button>
+                <button
+                  onClick={() => setActiveTab("failures")}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition text-left ${
+                    activeTab === "failures"
+                      ? "bg-slate-800 text-white shadow-sm border border-slate-700 font-semibold ring-1 ring-rose-500/30"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <ShieldAlert className={`w-4 h-4 ${activeTab === "failures" ? "text-rose-400" : "text-slate-500"}`} />
+                    <span>Past Failure Guardian</span>
+                  </div>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 font-bold">
+                    Shield
+                  </span>
+                </button>
 
-        <button
-          onClick={() => setActiveTab("vault")}
-          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
-            activeTab === "vault" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <Paperclip className="w-4 h-4 text-teal-400" />
-          Vault
-        </button>
+                <button
+                  onClick={() => setActiveTab("library")}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition text-left ${
+                    activeTab === "library"
+                      ? "bg-slate-800 text-white shadow-sm border border-slate-700 font-semibold ring-1 ring-emerald-500/30"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Award className={`w-4 h-4 ${activeTab === "library" ? "text-emerald-400" : "text-slate-500"}`} />
+                    <span>Validated Library</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-emerald-400">Cert 5/5</span>
+                </button>
+              </div>
+            </div>
 
-        <button
-          onClick={() => setActiveTab("diagnostics")}
-          className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
-            activeTab === "diagnostics" ? "bg-slate-800 text-white border border-slate-700 shadow-sm" : "text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <Cpu className="w-4 h-4 text-rose-400" />
-          AI Diagnostics
-        </button>
-      </div>
+            {/* GROUP 3: SCIENTIFIC INTELLIGENCE & AUDIT */}
+            <div className="pt-2 border-t border-slate-800/70">
+              <div className="px-3 pb-1.5 text-[10px] font-mono tracking-wider text-slate-500 uppercase font-semibold">
+                Intelligence & Audit
+              </div>
+              <div className="space-y-1">
+                <button
+                  onClick={() => setActiveTab("diagnostics")}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition text-left ${
+                    activeTab === "diagnostics"
+                      ? "bg-slate-800 text-white shadow-sm border border-slate-700 font-semibold ring-1 ring-rose-500/30"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Cpu className={`w-4 h-4 ${activeTab === "diagnostics" ? "text-rose-400" : "text-slate-500"}`} />
+                    <span>AI Diagnostics</span>
+                  </div>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                    HITL
+                  </span>
+                </button>
 
-      {/* TAB 1: APPARATUS & VERSION TREE */}
-      {activeTab === "apparatus" && (
+                <button
+                  onClick={() => setActiveTab("research")}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition text-left ${
+                    activeTab === "research"
+                      ? "bg-slate-800 text-white shadow-sm border border-slate-700 font-semibold ring-1 ring-cyan-500/30"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <BookOpen className={`w-4 h-4 ${activeTab === "research" ? "text-cyan-400" : "text-slate-500"}`} />
+                    <span>Research & Patents</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-500">Dossier</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab("vault")}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition text-left ${
+                    activeTab === "vault"
+                      ? "bg-slate-800 text-white shadow-sm border border-slate-700 font-semibold ring-1 ring-teal-500/30"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Paperclip className={`w-4 h-4 ${activeTab === "vault" ? "text-teal-400" : "text-slate-500"}`} />
+                    <span>Laboratory Vault</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-500">P&ID</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab("report")}
+                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold transition text-left mt-2 ${
+                    activeTab === "report"
+                      ? "bg-emerald-600 text-white shadow-lg shadow-emerald-950/50 border border-emerald-500"
+                      : "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Printer className="w-4 h-4" />
+                    <span>Formal Lab Report</span>
+                  </div>
+                  <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                    PDF · SHA256
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        {/* RIGHT MAIN OPERATIONS CANVAS */}
+        <section className="lg:col-span-8 xl:col-span-9 min-w-0">
+          {/* TAB 1: APPARATUS & VERSION TREE */}
+          {activeTab === "apparatus" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="lg:col-span-5 space-y-4">
@@ -754,6 +894,8 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+        </section>
+      </div>
     </div>
   );
 }
