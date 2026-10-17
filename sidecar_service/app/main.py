@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from app.unit_validator import normalize_measurement, UnitConversionRequest, UnitValidationResponse
 from app.ai_orchestrator import run_ai_diagnostics, ExperimentDiagnosticRequest, DiagnosticAnalysisResponse
-from app.uncertainty_engine import evaluate_guard_banded_criterion, UncertaintyEvaluation
+from app.uncertainty_engine import evaluate_guard_banded_criterion, UncertaintyEvaluation, UncertaintyRequest
 
 load_dotenv()
 
@@ -39,13 +39,14 @@ def validate_unit(req: UnitConversionRequest):
     return normalize_measurement(req.value, req.from_unit, req.target_unit, req.is_differential)
 
 @app.post("/api/eval/uncertainty", response_model=UncertaintyEvaluation)
-def evaluate_uncertainty(
-    observations: List[float],
-    target_value: float,
-    operator: str = ">=",
-    instrument_tolerance: float = 0.05
-):
-    return evaluate_guard_banded_criterion(observations, target_value, operator, instrument_tolerance)
+def evaluate_uncertainty(req: UncertaintyRequest):
+    return evaluate_guard_banded_criterion(
+        req.observations,
+        req.target_value,
+        req.operator,
+        req.instrument_tolerance,
+        req.target_max_value
+    )
 
 @app.post("/api/ai/diagnose")
 async def diagnose_experiment(req: ExperimentDiagnosticRequest, _: None = Depends(verify_secret)):

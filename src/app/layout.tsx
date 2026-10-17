@@ -26,10 +26,10 @@ export default function RootLayout({
           </div>
           <div className="flex items-center gap-3 text-xs">
             <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono">
-              ● Supabase Connected
+              ● Rigorous Traceability
             </span>
             <span className="px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300 font-mono">
-              Project: ytmgwbwnmiriltjmxyrl
+              ISO 17025 / ILAC-G8 Guard-Banding
             </span>
           </div>
         </header>

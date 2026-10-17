@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { dataService } from "@/lib/dataService";
+import { sidecarClient } from "@/lib/sidecarClient";
 import { Project, Apparatus, ApparatusVersion, BomItem } from "@/types";
 import BomBuilder from "@/components/BomBuilder";
 import VersionDiffViewer from "@/components/VersionDiffViewer";
@@ -32,7 +33,8 @@ import {
   ShieldAlert, 
   Award, 
   BookOpen,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Database
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -43,6 +45,7 @@ export default function Dashboard() {
   const [selectedVersion, setSelectedVersion] = useState<ApparatusVersion | null>(null);
   const [bomItems, setBomItems] = useState<BomItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [storageMode, setStorageMode] = useState<"remote" | "local">("local");
   
   // Navigation tabs
   const [activeTab, setActiveTab] = useState<"apparatus" | "bom" | "experiments" | "failures" | "library" | "research" | "report" | "diff" | "vault" | "diagnostics">("apparatus");
@@ -65,9 +68,10 @@ export default function Dashboard() {
   async function fetchWorkspaceData() {
     setLoading(true);
     try {
-      const { data: pData } = await supabase.from("projects").select("*").order("created_at", { ascending: false });
-      const { data: aData } = await supabase.from("apparatus").select("*").order("created_at", { ascending: false });
-      const { data: vData } = await supabase.from("apparatus_versions").select("*").order("version_number", { ascending: true });
+      const pData = await dataService.getProjects();
+      const aData = await dataService.getApparatusList();
+      const vData = await dataService.getVersions();
+      setStorageMode(dataService.getStorageMode());
 
       if (pData) setProjects(pData);
       if (aData) {
@@ -91,12 +95,8 @@ export default function Dashboard() {
   }
 
   async function loadBomForVersion(versionId: string) {
-    const { data: bData } = await supabase.from("bom_items").select("*").eq("apparatus_version_id", versionId);
-    if (bData) {
-      setBomItems(bData);
-    } else {
-      setBomItems([]);
-    }
+    const bData = await dataService.getBomItems(versionId);
+    setBomItems(bData || []);
   }
 
   function handleSelectVersion(ver: ApparatusVersion) {
@@ -107,26 +107,9 @@ export default function Dashboard() {
   async function handleSaveBom(items: BomItem[]) {
     if (!selectedVersion) return;
     try {
-      await supabase.from("bom_items").delete().eq("apparatus_version_id", selectedVersion.id);
-      const payload = items.map((item) => ({
-        apparatus_version_id: selectedVersion.id,
-        component_name: item.component_name,
-        component_type: item.component_type,
-        material: item.material,
-        dimensions: item.dimensions,
-        quantity: item.quantity,
-        unit: item.unit,
-        part_number_or_supplier: item.part_number_or_supplier,
-        custom_specs: item.custom_specs || {}
-      }));
-
-      if (payload.length > 0) {
-        const { error } = await supabase.from("bom_items").insert(payload);
-        if (error) throw error;
-      }
-
-      await loadBomForVersion(selectedVersion.id);
-      alert("Bill of Materials specifications updated and saved to Supabase.");
+      const saved = await dataService.saveBomItems(selectedVersion.id, items);
+      setBomItems(saved);
+      alert("Bill of Materials specifications updated and saved successfully.");
     } catch (err: any) {
       alert("Error saving BOM: " + err.message);
     }
@@ -135,48 +118,12 @@ export default function Dashboard() {
   async function handleBranchVersion(parentVersion: ApparatusVersion) {
     if (!selectedApparatus) return;
     try {
-      const nextVersionNum = parentVersion.version_number + 1;
-      const nextVersionTag = `V${nextVersionNum}.0`;
-
-      const { data: newVer, error: vErr } = await supabase.from("apparatus_versions").insert({
-        apparatus_id: selectedApparatus.id,
-        parent_version_id: parentVersion.id,
-        version_number: nextVersionNum,
-        version_tag: nextVersionTag,
-        status: "DRAFT",
-        operating_parameters: {
-          ...parentVersion.operating_parameters,
-          feed_rate_ml_min: ((parentVersion.operating_parameters?.feed_rate_ml_min || 5.0) * 1.15).toFixed(1),
-          coolant_flow_l_h: (parentVersion.operating_parameters?.coolant_flow_l_h || 120) + 40
-        },
-        design_rationale: `Iterated modification branched directly from ${parentVersion.version_tag}. Enhanced thermal contact and residency control.`,
-        safety_constraints: parentVersion.safety_constraints,
-        is_immutable: false
-      }).select().single();
-
-      if (vErr) throw vErr;
-
-      const { data: currentBoms } = await supabase.from("bom_items").select("*").eq("apparatus_version_id", parentVersion.id);
-      if (currentBoms && currentBoms.length > 0) {
-        const clonedBoms = currentBoms.map((b) => ({
-          apparatus_version_id: newVer.id,
-          component_name: b.component_name,
-          component_type: b.component_type,
-          material: b.material,
-          dimensions: b.dimensions,
-          quantity: b.quantity,
-          unit: b.unit,
-          part_number_or_supplier: b.part_number_or_supplier,
-          custom_specs: b.custom_specs
-        }));
-        await supabase.from("bom_items").insert(clonedBoms);
-      }
-
+      const newVer = await dataService.branchVersion(parentVersion, selectedApparatus);
       await fetchWorkspaceData();
       setSelectedVersion(newVer);
-      loadBomForVersion(newVer.id);
+      await loadBomForVersion(newVer.id);
       setActiveTab("bom");
-      alert(`Successfully branched ${parentVersion.version_tag} into new revision: ${nextVersionTag}`);
+      alert(`Successfully branched ${parentVersion.version_tag} into new revision: ${newVer.version_tag}`);
     } catch (err: any) {
       alert("Error branching configuration: " + err.message);
     }
@@ -185,7 +132,7 @@ export default function Dashboard() {
   async function handleSaveExperiment(expData: any) {
     if (!selectedApparatus) return;
     try {
-      const { data: newExp, error: expErr } = await supabase.from("experiments").insert({
+      await dataService.saveExperiment({
         project_id: selectedApparatus.project_id,
         apparatus_version_id: expData.apparatus_version_id,
         experiment_code: expData.experiment_code,
@@ -193,23 +140,9 @@ export default function Dashboard() {
         observed_deviations: expData.observed_deviations,
         primary_outcome: expData.primary_outcome,
         engineer_notes: expData.engineer_notes,
-        is_locked: false
-      }).select().single();
-
-      if (expErr) throw expErr;
-
-      if (expData.measurements && expData.measurements.length > 0) {
-        const mPayload = expData.measurements.map((m: any) => ({
-          experiment_id: newExp.id,
-          parameter_name: m.parameter_name,
-          measured_value: m.measured_value,
-          uncertainty_margin: m.uncertainty_margin || 0,
-          unit: m.unit,
-          run_index: m.run_index || 1,
-          is_outlier: false
-        }));
-        await supabase.from("measurements").insert(mPayload);
-      }
+        failure_symptoms: expData.failure_symptoms,
+        measurements: expData.measurements
+      });
 
       alert(`Experiment test run ${expData.experiment_code} successfully committed with outcome: ${expData.primary_outcome}!`);
       
@@ -229,12 +162,7 @@ export default function Dashboard() {
     if (!confirmLock) return;
 
     try {
-      const { error } = await supabase.from("apparatus_versions").update({
-        status: "SUCCESSFUL",
-        is_immutable: true
-      }).eq("id", version.id);
-
-      if (error) throw error;
+      await dataService.markVersionSuccessful(version.id);
       await fetchWorkspaceData();
       alert(`${version.version_tag} certified and locked as an Immutable Successful Record.`);
     } catch (err: any) {
@@ -246,66 +174,50 @@ export default function Dashboard() {
     setDiffVersionA(vA);
     setDiffVersionB(vB);
 
-    const { data: bA } = await supabase.from("bom_items").select("*").eq("apparatus_version_id", vA.id);
-    const { data: bB } = await supabase.from("bom_items").select("*").eq("apparatus_version_id", vB.id);
+    const bA = await dataService.getBomItems(vA.id);
+    const bB = await dataService.getBomItems(vB.id);
 
     setDiffBomA(bA || []);
     setDiffBomB(bB || []);
     setActiveTab("diff");
   }
 
+  async function handleResetData() {
+    if (confirm("Reset chemical pilot plant dataset to default initial state?")) {
+      await dataService.resetToDefaultData();
+      await fetchWorkspaceData();
+      alert("Data reset to initial state.");
+    }
+  }
+
   async function runAiDiagnostics() {
     setDiagLoading(true);
     setDiagResult(null);
     try {
-      const res = await fetch("http://localhost:8000/api/ai/diagnose", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          apparatus_name: selectedApparatus?.name || "Catalytic Flow Reactor",
-          version_tag: selectedVersion?.version_tag || "V1.0",
-          problem_statement: "Maintain high single-pass syngas conversion without catalyst thermal sintering.",
-          target_specification: "Conversion >= 85%, Bed Delta-T <= 8°C, Max Pressure Drop <= 1.5 bar",
-          bom_components: bomItems,
-          operating_parameters: selectedVersion?.operating_parameters || {},
-          measurements: [
-            { parameter_name: "Syngas Conversion", measured_value: 61.4, unit: "%" },
-            { parameter_name: "Max Catalyst Bed Delta-T", measured_value: 22.8, unit: "degC" },
-            { parameter_name: "Column Delta-P", measured_value: 3.2, unit: "bar" }
-          ],
-          missed_criteria: [
-            { metric_name: "Syngas Conversion", target_value: 85.0, observed_value: 61.4, unit: "%" },
-            { metric_name: "Max Bed Delta-T", target_value: 8.0, observed_value: 22.8, unit: "degC" },
-            { metric_name: "Pressure Drop", target_value: 1.5, observed_value: 3.2, unit: "bar" }
-          ],
-          observed_deviations: diagObs,
-          engineer_notes: "Strong localized hot-spots suggest maldistribution in fluidization or laminar boundary heat-transfer choke."
-        })
+      const data = await sidecarClient.diagnoseExperiment({
+        apparatus_name: selectedApparatus?.name || "Catalytic Flow Reactor",
+        version_tag: selectedVersion?.version_tag || "V1.0",
+        problem_statement: "Maintain high single-pass syngas conversion without catalyst thermal sintering.",
+        target_specification: "Conversion >= 85%, Bed Delta-T <= 8°C, Max Pressure Drop <= 1.5 bar",
+        bom_components: bomItems,
+        operating_parameters: selectedVersion?.operating_parameters || {},
+        measurements: [
+          { parameter_name: "Syngas Conversion", measured_value: 61.4, unit: "%" },
+          { parameter_name: "Max Catalyst Bed Delta-T", measured_value: 22.8, unit: "degC" },
+          { parameter_name: "Column Delta-P", measured_value: 3.2, unit: "bar" }
+        ],
+        missed_criteria: [
+          { metric_name: "Syngas Conversion", target_value: 85.0, observed_value: 61.4, unit: "%" },
+          { metric_name: "Max Bed Delta-T", target_value: 8.0, observed_value: 22.8, unit: "degC" },
+          { metric_name: "Pressure Drop", target_value: 1.5, observed_value: 3.2, unit: "bar" }
+        ],
+        observed_deviations: diagObs,
+        engineer_notes: "Strong localized hot-spots suggest maldistribution in fluidization or laminar boundary heat-transfer choke."
       });
-
-      if (!res.ok) throw new Error(`Sidecar error: ${res.statusText}`);
-      const data = await res.json();
       setDiagResult(data);
     } catch (err: any) {
-      setDiagResult({
-        outcome_summary: "Catalytic thermal runaway confirmed. Radial heat dissipation capacity is exceeded by the exothermic hydrogenation enthalpy.",
-        ranked_causes: [
-          { cause: "Laminar boundary thermal choke inside coolant jacket annulus", evidence_level: 5 },
-          { cause: "Fine catalyst pellet pack density causing elevated differential pressure (3.2 bar vs 1.5 bar target)", evidence_level: 4 }
-        ],
-        safety_verification: "Rupture disk rated at 40 bar is safe, but continuous operation above 240°C risks catalyst coking and sintering.",
-        hypotheses: [
-          {
-            title: "Dilute catalyst bed 1:1 with inert silicon carbide (SiC) & augment coolant pump throughput",
-            expected_benefit: "Reduces peak delta-T by 65% and restores conversion toward 82-86%.",
-            evidential_support_score: 5,
-            proposed_changes: [
-              { target_component: "Active Catalyst Bed", before_spec: { "dilution_ratio": "0%" }, after_spec: { "dilution_ratio": "50% SiC inert pellets" } },
-              { target_component: "Coolant Jacket Recirculation", before_spec: { "flow_l_h": 120 }, after_spec: { "flow_l_h": 220 } }
-            ]
-          }
-        ]
-      });
+      console.error("AI diagnostics error:", err);
+      alert("Error invoking scientific diagnostics: " + (err.message || String(err)));
     } finally {
       setDiagLoading(false);
     }
@@ -329,6 +241,12 @@ export default function Dashboard() {
         </div>
 
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono">
+            <span className={`w-2 h-2 rounded-full ${storageMode === "remote" ? "bg-emerald-400 animate-pulse" : "bg-cyan-400"}`} />
+            <span className={storageMode === "remote" ? "text-emerald-400" : "text-cyan-400"}>
+              {storageMode === "remote" ? "Supabase Live" : "Resilient Offline"}
+            </span>
+          </div>
           <button
             onClick={() => setActiveTab("report")}
             className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 transition flex items-center gap-2 text-xs font-mono"
@@ -340,9 +258,16 @@ export default function Dashboard() {
           <button 
             onClick={fetchWorkspaceData}
             className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 transition"
-            title="Refresh from Supabase"
+            title="Refresh Data"
           >
             <RefreshCw className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleResetData}
+            className="px-2.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition text-[11px] font-mono"
+            title="Reset dataset to initial state"
+          >
+            Reset
           </button>
         </div>
       </div>
@@ -801,6 +726,27 @@ export default function Dashboard() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {diagResult.safety_verification && (
+                  <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 flex items-start gap-2.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold block text-amber-400 mb-0.5">Chemical Safety Constraint Verification</span>
+                      <p className="text-slate-300 leading-relaxed">{diagResult.safety_verification}</p>
+                    </div>
+                  </div>
+                )}
+
+                {diagResult.missing_data_requests?.length > 0 && (
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+                    <span className="font-bold text-slate-300 block">Missing Empirical Feeds (Recommended to Confirm Cause)</span>
+                    <ul className="list-disc list-inside space-y-1 text-slate-400">
+                      {diagResult.missing_data_requests.map((reqStr: string, rIdx: number) => (
+                        <li key={reqStr}>{reqStr}</li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>

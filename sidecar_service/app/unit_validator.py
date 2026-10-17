@@ -3,13 +3,15 @@ from typing import Dict, Any, Optional
 from pydantic import BaseModel
 
 # Initialize unit registry with explicit chemical R&D definitions
-ureg = pint.UnitRegistry()
+ureg = pint.UnitRegistry(autoconvert_offset_to_baseunit=True)
 
 # Define specific chemical pressure and flow contexts
 ureg.define("barg = bar") # Gauge pressure relative to atmospheric
 ureg.define("bara = bar") # Absolute pressure
+ureg.define("standard_liter = liter")
 ureg.define("slpm = standard_liter / minute") # Standard liters per minute (0°C, 1 atm)
 ureg.define("delta_degC = delta_degree_Celsius") # Temperature differential (not absolute offset)
+ureg.define("delta_degF = delta_degree_Fahrenheit")
 
 class UnitConversionRequest(BaseModel):
     value: float
@@ -44,7 +46,7 @@ def normalize_measurement(value: float, unit_str: str, target_unit_str: Optional
         elif is_differential and sanitized_unit in ["degF", "°F", "fahrenheit"]:
             sanitized_unit = "delta_degF"
 
-        quantity = value * ureg(sanitized_unit)
+        quantity = ureg.Quantity(value, sanitized_unit)
         base_si = quantity.to_base_units()
         
         converted_val = None
@@ -52,6 +54,8 @@ def normalize_measurement(value: float, unit_str: str, target_unit_str: Optional
             target_sanitized = target_unit_str.strip()
             if is_differential and target_sanitized in ["degC", "°C", "celsius"]:
                 target_sanitized = "delta_degC"
+            elif is_differential and target_sanitized in ["degF", "°F", "fahrenheit"]:
+                target_sanitized = "delta_degF"
             converted = quantity.to(target_sanitized)
             converted_val = float(converted.magnitude)
 

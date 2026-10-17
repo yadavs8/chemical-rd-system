@@ -1,5 +1,6 @@
-import numpy as np
-from typing import List, Dict, Any, Tuple
+import math
+import statistics
+from typing import List, Dict, Any, Tuple, Optional
 from pydantic import BaseModel
 
 class UncertaintyEvaluation(BaseModel):
@@ -13,12 +14,19 @@ class UncertaintyEvaluation(BaseModel):
     is_indeterminate: bool
     verdict: str
 
+class UncertaintyRequest(BaseModel):
+    observations: List[float]
+    target_value: float
+    operator: str = ">="
+    instrument_tolerance: float = 0.05
+    target_max_value: Optional[float] = None
+
 def evaluate_guard_banded_criterion(
     observations: List[float],
     target_value: float,
     operator: str, # ">=", "<=", "==", "RANGE"
     instrument_tolerance: float = 0.05,
-    target_max_value: float = None
+    target_max_value: Optional[float] = None
 ) -> UncertaintyEvaluation:
     """
     Implements GUM / JCGM 100 & ISO 14253-1 / ILAC-G8 guard-banded decision rules:
@@ -33,11 +41,11 @@ def evaluate_guard_banded_criterion(
             is_indeterminate=True, verdict="MISSING_DATA"
         )
     
-    mean_val = float(np.mean(observations))
-    sample_std = float(np.std(observations, ddof=1)) if n > 1 else 0.0
-    u_A = sample_std / np.sqrt(n) if n > 1 else sample_std
-    u_B = instrument_tolerance / np.sqrt(3) # Rectangular distribution assumption for instrument resolution
-    u_c = float(np.sqrt(u_A**2 + u_B**2))
+    mean_val = float(statistics.mean(observations))
+    sample_std = float(statistics.stdev(observations)) if n > 1 else 0.0
+    u_A = sample_std / math.sqrt(n) if n > 1 else sample_std
+    u_B = instrument_tolerance / math.sqrt(3) # Rectangular distribution assumption for instrument resolution
+    u_c = float(math.sqrt(u_A**2 + u_B**2))
     U_k2 = float(2.0 * u_c) # k=2 coverage factor (~95% coverage)
 
     # ISO 14253-1 Guard-Banded Decision Rules

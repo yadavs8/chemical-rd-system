@@ -12,7 +12,9 @@ import {
   Layers, 
   Activity,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  Download,
+  FileSpreadsheet
 } from "lucide-react";
 import { ApparatusVersion, OutcomeClassification } from "@/types";
 
@@ -109,6 +111,75 @@ export default function ExperimentLogger({ version, onSaveExperiment }: Experime
     setMeasurements((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // 1-Click Telemetry CSV Export Feature
+  const handleExportTelemetryCsv = () => {
+    const headers = [
+      "Experiment_Code",
+      "Apparatus_Version",
+      "Run_Index",
+      "Parameter_Name",
+      "Measured_Value",
+      "Uncertainty_Margin",
+      "Unit",
+      "Target_Specification",
+      "Benchmark_Status",
+      "Is_Outlier",
+      "Primary_Outcome",
+      "Conducted_Timestamp",
+      "Standard_Operating_Procedure",
+      "Observed_Deviations",
+      "Engineer_Synthesis"
+    ];
+
+    const rows = measurements.map((m) => {
+      const matchingCrit = criteria.find(
+        (c) => c.metric_name.toLowerCase() === m.parameter_name.toLowerCase()
+      );
+      const targetSpec = matchingCrit ? `${matchingCrit.operator} ${matchingCrit.target_value} ${matchingCrit.unit}` : "Standard Record";
+      let status = "LOGGED";
+      if (matchingCrit && m.measured_value !== "") {
+        const val = Number(m.measured_value);
+        if (matchingCrit.operator === ">=") status = val >= matchingCrit.target_value ? "PASSED" : "FAILED";
+        else if (matchingCrit.operator === "<=") status = val <= matchingCrit.target_value ? "PASSED" : "FAILED";
+        else if (matchingCrit.operator === "==") status = Math.abs(val - matchingCrit.target_value) < 0.001 ? "PASSED" : "FAILED";
+        else if (matchingCrit.operator === "RANGE" && matchingCrit.target_max_value) status = val >= matchingCrit.target_value && val <= matchingCrit.target_max_value ? "PASSED" : "FAILED";
+      }
+
+      return [
+        experimentCode,
+        version.version_tag,
+        m.run_index,
+        m.parameter_name,
+        m.measured_value,
+        m.uncertainty_margin || 0,
+        m.unit,
+        targetSpec,
+        status,
+        m.is_outlier ? "YES" : "NO",
+        computedOutcome,
+        new Date().toISOString(),
+        procedureSteps.replace(/\n/g, "; "),
+        observedDeviations || "None",
+        engineerNotes || "None"
+      ];
+    });
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    ].join("\r\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${experimentCode}_telemetry_dataset_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -140,7 +211,7 @@ export default function ExperimentLogger({ version, onSaveExperiment }: Experime
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 font-mono text-xs">
             <span className="text-slate-500">Auto-Evaluated Outcome:</span>
             <span className={`px-2.5 py-1 rounded-full font-bold border ${
@@ -153,6 +224,17 @@ export default function ExperimentLogger({ version, onSaveExperiment }: Experime
               {computedOutcome}
             </span>
           </div>
+
+          {/* 1-Click Telemetry Export CSV Button */}
+          <button
+            type="button"
+            onClick={handleExportTelemetryCsv}
+            className="px-3.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-700 text-xs font-mono text-slate-200 transition shadow-sm flex items-center gap-1.5"
+            title="Export complete test telemetry dataset to CSV"
+          >
+            <Download className="w-3.5 h-3.5 text-cyan-400" />
+            Export Telemetry CSV
+          </button>
 
           <button
             onClick={handleSave}
